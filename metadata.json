@@ -1,0 +1,6 @@
+{
+  "name": "JS AlphaSoft VMS",
+  "description": "Enterprise Zero-Trust Visitor Management & Facility Access Control System by JS AlphaSoft",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
