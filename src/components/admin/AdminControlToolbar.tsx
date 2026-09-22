@@ -6,7 +6,6 @@ import {
   Sliders,
   Bell,
   AlertTriangle,
-  LogOut,
   RotateCcw
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
@@ -35,7 +34,6 @@ export const AdminControlToolbar: React.FC<AdminControlToolbarProps> = ({
   onToggleAutoRendering,
 }) => {
   const state = storageService.getState();
-  const activeUser = storageService.getActiveUser();
   const [resetFeedback, setResetFeedback] = useState(false);
 
   const handleTenantChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -48,15 +46,6 @@ export const AdminControlToolbar: React.FC<AdminControlToolbarProps> = ({
 
   const handleGateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     storageService.setActiveContext({ gateId: e.target.value });
-  };
-
-  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedUserId = e.target.value;
-    storageService.setActiveContext({ userId: selectedUserId });
-    const targetUser = state.users.find((u) => u.id === selectedUserId);
-    if (targetUser && onRoleAutoRender) {
-      onRoleAutoRender(targetUser.role);
-    }
   };
 
   const handleResetData = () => {
@@ -227,68 +216,6 @@ export const AdminControlToolbar: React.FC<AdminControlToolbarProps> = ({
             <AlertTriangle className="w-4 h-4" />
           </button>
         )}
-
-        {/* Active User Credentials Badge & Switcher */}
-        <div className="flex items-center gap-2 bg-[#0d2a42] px-2.5 py-1.5 rounded-lg border border-[#1b4b75] shrink-0">
-          <button
-            type="button"
-            onClick={onOpenProfileModal}
-            title="Click to manage Host Profile & Arrival Notification Channels"
-            className="flex items-center gap-2 text-left hover:opacity-90 transition cursor-pointer"
-          >
-            <div className="w-7 h-7 rounded-full bg-teal-600/40 text-teal-200 border border-teal-500/50 flex items-center justify-center font-bold text-xs shrink-0">
-              {activeUser.name.charAt(0)}
-            </div>
-            <div className="text-left hidden sm:block">
-              <div className="text-xs font-semibold text-white leading-none flex items-center gap-1">
-                <span>{activeUser.name}</span>
-                <span className="text-[10px] text-teal-300 font-mono">({activeUser.loginId})</span>
-              </div>
-              <div className="text-[10px] text-slate-300 font-medium leading-tight mt-0.5 flex items-center gap-1">
-                <span>{activeUser.role.replace(/_/g, ' ')}</span>
-                <span className="text-[9px] text-teal-400 font-mono underline">Alerts</span>
-              </div>
-            </div>
-          </button>
-
-          {/* Quick Persona Switcher */}
-          <div className="relative">
-            <select
-              id="admin-toolbar-persona-select"
-              value={activeUser.id}
-              onChange={handleRoleChange}
-              className="text-[11px] bg-[#123B5D] text-slate-200 border border-slate-600 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer"
-              title="Switch User Persona (RBAC Simulation)"
-            >
-              <optgroup label="Reception & Security">
-                <option value="usr-priya">Priya Nair (reception)</option>
-                <option value="usr-suresh">Subedar Suresh Patil (security)</option>
-                <option value="usr-vikram">Vikramaditya Chauhan (sec-admin)</option>
-              </optgroup>
-              <optgroup label="Administration & Audit">
-                <option value="usr-arun">Arun Mehra (admin)</option>
-                <option value="usr-ananya">Ananya Sharma (superadmin)</option>
-                <option value="usr-kavita">Kavita Iyer (auditor)</option>
-              </optgroup>
-              <optgroup label="Hosts & Approvers">
-                <option value="usr-rajesh">Dr. Rajesh Sengupta (host)</option>
-                <option value="usr-pooja">Pooja Deshmukh (approver)</option>
-              </optgroup>
-            </select>
-          </div>
-
-          {/* Logout Button */}
-          {onLogout && (
-            <button
-              id="admin-toolbar-logout-btn"
-              onClick={onLogout}
-              title="Log out of VMS terminal"
-              className="p-1 rounded text-slate-400 hover:text-red-300 hover:bg-red-500/20 transition ml-1"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
 
         {/* Reset Master State */}
         <button

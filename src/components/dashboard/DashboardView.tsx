@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Users,
   Clock,
@@ -9,10 +9,13 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   CheckCircle2,
-  XCircle
+  XCircle,
+  FileDown,
+  Loader2
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { Visit } from '../../types';
+import { generateVisitorLogsPdf } from '../../utils/reportPdfGenerator';
 
 interface DashboardViewProps {
   onNavigate: (view: any) => void;
@@ -31,6 +34,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onSele
   const completedToday = currentSiteVisits.filter((v) => v.state === 'CHECKED_OUT');
 
   const onlinePrintersCount = state.devices.filter((d) => d.type === 'BADGE_PRINTER' && d.status === 'ONLINE').length;
+
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const handleDownloadCurrentlyInsidePdf = () => {
+    try {
+      setIsExportingPdf(true);
+      generateVisitorLogsPdf(
+        currentlyInside,
+        activeTenant,
+        activeSite,
+        `LIVE ON-PREMISES VISITOR ROSTER • ${activeSite.name.toUpperCase()}`
+      );
+    } catch (err) {
+      console.error('Failed to generate on-premises visitor PDF:', err);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   const handleQuickApprove = (visitId: string) => {
     storageService.approveVisit(visitId, 'SECURITY');
@@ -148,17 +169,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate, onSele
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Live On-Premises Visitors */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-[#D8E1E8] shadow-xs p-5">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
             <div>
               <h2 className="text-sm font-bold text-[#172B3A]">Currently Inside Facility</h2>
               <p className="text-xs text-[#526575]">Live headcount with active assigned badges</p>
             </div>
-            <button
-              onClick={() => onNavigate('reception')}
-              className="text-xs text-[#0F766E] font-semibold hover:underline"
-            >
-              View Turnstile Desk →
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                id="dashboard-download-visitor-pdf-btn"
+                onClick={handleDownloadCurrentlyInsidePdf}
+                disabled={isExportingPdf || currentlyInside.length === 0}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-semibold transition cursor-pointer disabled:opacity-50 shadow-2xs shrink-0"
+                title="Download formatted live visitor roster report as PDF"
+              >
+                {isExportingPdf ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-700" />
+                    <span>Exporting...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileDown className="w-3.5 h-3.5 text-teal-700" />
+                    <span>Download as PDF</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => onNavigate('reception')}
+                className="text-xs text-[#0F766E] font-semibold hover:underline"
+              >
+                View Turnstile Desk →
+              </button>
+            </div>
           </div>
 
           {currentlyInside.length === 0 ? (

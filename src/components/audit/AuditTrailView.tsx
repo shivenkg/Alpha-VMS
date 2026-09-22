@@ -7,16 +7,33 @@ import {
   Eye,
   Calendar,
   Lock,
-  Download
+  Download,
+  FileDown,
+  Loader2
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { AuditEvent } from '../../types';
+import { generateAuditTrailPdf } from '../../utils/reportPdfGenerator';
 
 export const AuditTrailView: React.FC = () => {
   const state = storageService.getState();
+  const activeTenant = storageService.getActiveTenant();
+  const activeSite = storageService.getActiveSite();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [inspectEvent, setInspectEvent] = useState<AuditEvent | null>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const handleDownloadPdf = () => {
+    try {
+      setIsExportingPdf(true);
+      generateAuditTrailPdf(filteredEvents, activeTenant, activeSite);
+    } catch (err) {
+      console.error('Failed to export audit trail PDF:', err);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   const filteredEvents = state.auditEvents.filter((e) => {
     const matchesSearch =
@@ -58,7 +75,7 @@ export const AuditTrailView: React.FC = () => {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="text-xs px-2.5 py-1.5 bg-[#F4F7FA] border border-[#D8E1E8] rounded-lg text-[#172B3A]"
+            className="text-xs px-2.5 py-1.5 bg-[#F4F7FA] border border-[#D8E1E8] rounded-lg text-[#172B3A] cursor-pointer"
           >
             <option value="ALL">All Actions</option>
             <option value="CHECK">Check-In / Out</option>
@@ -66,6 +83,26 @@ export const AuditTrailView: React.FC = () => {
             <option value="PRINT">Badge Prints</option>
             <option value="EMERGENCY">Emergency</option>
           </select>
+
+          <button
+            id="download-audit-pdf-btn"
+            onClick={handleDownloadPdf}
+            disabled={isExportingPdf || filteredEvents.length === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-semibold transition cursor-pointer shadow-2xs shrink-0 disabled:opacity-50"
+            title="Download formatted audit trail log as PDF document"
+          >
+            {isExportingPdf ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-700" />
+                <span>Exporting...</span>
+              </>
+            ) : (
+              <>
+                <FileDown className="w-3.5 h-3.5 text-teal-700" />
+                <span>Download as PDF</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 

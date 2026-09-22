@@ -19,15 +19,25 @@ import {
   Globe,
   Database,
   Search,
-  Lock
+  Lock,
+  FileSpreadsheet,
+  CreditCard,
+  ShieldAlert,
+  Printer
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { AppUser, Tenant, UserRole } from '../../types';
 import { JSAlphaSoftLogo } from '../common/JSAlphaSoftLogo';
 import { AdminControlToolbar } from './AdminControlToolbar';
+import { GoogleSheetsConfigTab } from './GoogleSheetsConfigTab';
+import { VisitorPassDesignerTab } from './VisitorPassDesignerTab';
+import { RoleWorkflowManagementTab } from './RoleWorkflowManagementTab';
+import { AdminGlobalSearchFilterBar } from './AdminGlobalSearchFilterBar';
+
+export type AdminActiveTab = 'users' | 'tenants' | 'customization' | 'sheets' | 'pass_designer' | 'roles_workflow';
 
 interface AdminManagementViewProps {
-  initialTab?: 'users' | 'tenants' | 'customization';
+  initialTab?: AdminActiveTab;
   onOpenSharePreRegModal?: () => void;
   onOpenSettingsModal?: () => void;
   onOpenProfileModal?: () => void;
@@ -49,14 +59,31 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
   isAutoRenderingEnabled = true,
   onToggleAutoRendering,
 }) => {
-  const [activeTab, setActiveTab] = useState<'users' | 'tenants' | 'customization'>(initialTab);
+  const [activeTab, setActiveTab] = useState<AdminActiveTab>(initialTab);
   const state = storageService.getState();
   const activeTenant = storageService.getActiveTenant();
   const activeUser = storageService.getActiveUser();
+  const role: UserRole = activeUser?.role || 'RECEPTIONIST';
+  const isSuperAdmin = role === 'PLATFORM_SUPER_ADMIN';
 
   // Feedback notifications
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="bg-white rounded-2xl border border-amber-200 p-8 text-center max-w-lg mx-auto shadow-sm my-12">
+        <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4 text-amber-700">
+          <ShieldAlert className="w-6 h-6" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900 mb-2">Admin Control Center Hub Restricted</h2>
+        <p className="text-sm text-slate-600 mb-4">
+          The Admin Control Center Hub is restricted exclusively to the Platform Super Admin profile. Your current role is{' '}
+          <span className="font-semibold text-slate-800">{role.replace(/_/g, ' ')}</span>.
+        </p>
+      </div>
+    );
+  }
 
   // ----------------------------------------------------
   // TAB 1: User Management State & Handlers
@@ -218,42 +245,142 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
         onToggleAutoRendering={onToggleAutoRendering}
       />
 
+      {/* Active Enterprise Tenant Selector & Isolation Context */}
+      <div className="bg-gradient-to-r from-[#123B5D] via-[#10324f] to-[#0F766E] rounded-2xl p-4 sm:p-5 text-white shadow-md border border-[#1b4b75] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-teal-300 shrink-0">
+            <Building2 className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] uppercase font-mono tracking-widest px-2 py-0.5 rounded bg-teal-400/20 text-teal-200 border border-teal-400/30 font-bold">
+                Active Enterprise Tenant
+              </span>
+              <span className="text-xs text-white/50">•</span>
+              <span className="text-xs font-semibold text-teal-100">
+                Tier: <strong className="text-white">{activeTenant.tier.replace(/_/g, ' ')}</strong>
+              </span>
+              <span className="text-xs text-white/50">•</span>
+              <span className="text-[11px] font-mono text-emerald-300 flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                Shard: {activeTenant.databaseRef || 'tenant_db_primary'} (HEALTHY)
+              </span>
+            </div>
+            <h2 className="text-lg font-black tracking-tight text-white mt-1">
+              {activeTenant.name} <span className="font-mono text-sm text-teal-300 font-normal">[{activeTenant.code}]</span>
+            </h2>
+            <p className="text-xs text-slate-300">
+              Facility Scope: {state.sites.filter((s) => s.tenantId === activeTenant.id).length} Campus Sites •{' '}
+              {
+                state.gates.filter((g) =>
+                  state.sites
+                    .filter((s) => s.tenantId === activeTenant.id)
+                    .map((s) => s.id)
+                    .includes(g.siteId)
+                ).length
+              }{' '}
+              Turnstile Gates • Timezone: {activeTenant.timezone || 'Asia/Kolkata'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 w-full md:w-auto shrink-0 bg-black/25 p-2 rounded-xl border border-white/15">
+          <label htmlFor="admin-enterprise-tenant-switcher" className="text-xs font-bold text-teal-200 whitespace-nowrap pl-1">
+            Select Active Tenant:
+          </label>
+          <select
+            id="admin-enterprise-tenant-switcher"
+            value={activeTenant.id}
+            onChange={(e) => {
+              const newId = e.target.value;
+              const tenant = state.tenants.find((t) => t.id === newId);
+              storageService.setActiveContext({ tenantId: newId });
+              if (tenant) {
+                setSuccessToast(`Active Enterprise Tenant switched to: ${tenant.name} (${tenant.code})`);
+                setTimeout(() => setSuccessToast(null), 3500);
+              }
+            }}
+            className="bg-[#0b2438] text-white font-semibold text-xs border border-teal-500/50 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-400 cursor-pointer max-w-full"
+          >
+            {state.tenants.map((t) => (
+              <option key={t.id} value={t.id} className="bg-[#123B5D] text-white">
+                {t.name} ({t.code}) — {t.tier.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {/* Admin Module Header */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-md bg-[#123B5D]/10 text-[#123B5D] text-[11px] font-bold uppercase tracking-wider">
-              Administration Center
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+        <div className="w-full">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-md bg-[#123B5D]/10 text-[#123B5D] text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">
+              Administration Center Hub
             </span>
             <span className="text-xs text-slate-400">•</span>
-            <span className="text-xs text-slate-500 font-medium">
-              Active Tenant: <strong className="text-[#172B3A]">{activeTenant.name}</strong>
+            <span className="text-xs text-slate-600 font-medium whitespace-nowrap flex items-center gap-1">
+              Enterprise Tenant Context: <strong className="text-[#172B3A] font-bold">{activeTenant.name}</strong>
             </span>
           </div>
-          <h1 className="text-xl font-bold text-[#172B3A] mt-1 tracking-tight">
-            Tenant Management, System Customization & User Login ID Provisioning
+          <h1 className="text-xl sm:text-2xl font-bold text-[#172B3A] mt-2 tracking-tight">
+            Tenant Management, System Customization & Security Workflow Governance
           </h1>
-          <p className="text-xs text-[#526575] mt-0.5">
-            Configure enterprise security policies, multi-tenant isolation, user credentials, and corporate branding.
+          <p className="text-xs sm:text-sm text-[#526575] mt-1 max-w-3xl leading-relaxed">
+            Configure multi-tenant isolation, role permission matrices, physical pass formats, and corporate credentials.
           </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex items-center bg-[#F4F7FA] p-1 rounded-xl border border-slate-200 shrink-0">
+        {/* Tab Switcher - Full-width dedicated strip */}
+        <div className="mt-5 pt-4 border-t border-slate-100 flex items-center overflow-x-auto gap-1.5 bg-[#F4F7FA] p-1.5 rounded-xl border border-slate-200">
           <button
+            id="admin-tab-users"
             onClick={() => setActiveTab('users')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'users'
                 ? 'bg-white text-[#123B5D] shadow-xs'
                 : 'text-[#526575] hover:text-[#172B3A]'
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            <span>User Login IDs ({state.users.length})</span>
+            <span>User Accounts ({state.users.length})</span>
+          </button>
+
+          {/* Pass Format & Thermal Label Customiser — Visible ONLY under Super Admin role */}
+          {isSuperAdmin && (
+            <button
+              id="admin-tab-pass-designer"
+              onClick={() => setActiveTab('pass_designer')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+                activeTab === 'pass_designer'
+                  ? 'bg-white text-purple-900 border border-purple-200 shadow-xs'
+                  : 'text-[#526575] hover:text-purple-900'
+              }`}
+            >
+              <Printer className="w-3.5 h-3.5 text-purple-600" />
+              <span>Pass & Thermal Customiser</span>
+              <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 text-[9px] font-black uppercase tracking-wider ml-0.5">
+                Super Admin
+              </span>
+            </button>
+          )}
+
+          <button
+            id="admin-tab-roles-workflow"
+            onClick={() => setActiveTab('roles_workflow')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+              activeTab === 'roles_workflow'
+                ? 'bg-white text-indigo-800 shadow-xs'
+                : 'text-[#526575] hover:text-[#172B3A]'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-indigo-700" />
+            <span>Roles & Access Limits</span>
           </button>
           <button
+            id="admin-tab-tenants"
             onClick={() => setActiveTab('tenants')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'tenants'
                 ? 'bg-white text-[#123B5D] shadow-xs'
                 : 'text-[#526575] hover:text-[#172B3A]'
@@ -263,18 +390,44 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
             <span>Tenants ({state.tenants.length})</span>
           </button>
           <button
+            id="admin-tab-customization"
             onClick={() => setActiveTab('customization')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'customization'
                 ? 'bg-white text-[#123B5D] shadow-xs'
                 : 'text-[#526575] hover:text-[#172B3A]'
             }`}
           >
             <Sliders className="w-3.5 h-3.5" />
-            <span>Customization & Branding</span>
+            <span>Customization</span>
+          </button>
+          <button
+            id="admin-tab-google-sheets"
+            onClick={() => setActiveTab('sheets')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
+              activeTab === 'sheets'
+                ? 'bg-white text-emerald-800 shadow-xs'
+                : 'text-[#526575] hover:text-[#172B3A]'
+            }`}
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Google Sheet Sync</span>
           </button>
         </div>
       </div>
+
+      {/* Global Administrative Search & Filter Hub */}
+      <AdminGlobalSearchFilterBar
+        onNavigateToTab={(tab) => setActiveTab(tab)}
+        onFilterUsersTab={(query) => {
+          setActiveTab('users');
+          setUserSearch(query);
+        }}
+        onNotifySuccess={(msg) => {
+          setSuccessToast(msg);
+          setTimeout(() => setSuccessToast(null), 3500);
+        }}
+      />
 
       {/* ========================================================================= */}
       {/* TAB 1: User Login ID Creation & User Management */}
@@ -631,6 +784,76 @@ export const AdminManagementView: React.FC<AdminManagementViewProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 4: Google Sheets Configuration */}
+      {/* ========================================================================= */}
+      {activeTab === 'sheets' && (
+        <GoogleSheetsConfigTab
+          onNotifySuccess={(msg) => {
+            setSuccessToast(msg);
+            setTimeout(() => setSuccessToast(null), 4000);
+          }}
+          onNotifyError={(msg) => {
+            setErrorToast(msg);
+            setTimeout(() => setErrorToast(null), 4000);
+          }}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 5: Visitor Pass & Thermal Label Customiser (Super Admin Clearance) */}
+      {/* ========================================================================= */}
+      {activeTab === 'pass_designer' && (
+        isSuperAdmin ? (
+          <VisitorPassDesignerTab
+            onSuccessToast={(msg) => {
+              setSuccessToast(msg);
+              setTimeout(() => setSuccessToast(null), 4000);
+            }}
+          />
+        ) : (
+          <div className="bg-white rounded-2xl border border-amber-200 p-8 text-center space-y-4 shadow-xs">
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200">
+              <Shield className="w-7 h-7" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-[#172B3A]">Restricted: Platform Super Admin Clearance Required</h3>
+              <p className="text-xs text-[#526575] max-w-md mx-auto mt-1">
+                Visitor Pass Format Designer & Thermal Label Customiser is restricted exclusively to <strong>Platform Super Admin (Tier 0)</strong> clearance. Your active session role is <strong>{activeUser?.role.replace(/_/g, ' ')}</strong>.
+              </p>
+            </div>
+            <div className="pt-2">
+              <button
+                onClick={() => {
+                  const superAdmin = state.users.find((u) => u.role === 'PLATFORM_SUPER_ADMIN');
+                  if (superAdmin) {
+                    storageService.setActiveContext({ userId: superAdmin.id });
+                    setSuccessToast('Switched to Platform Super Admin: Ananya Sharma');
+                    setTimeout(() => setSuccessToast(null), 3000);
+                  }
+                }}
+                className="px-4 py-2 bg-[#123B5D] hover:bg-[#0F766E] text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-2 cursor-pointer shadow-xs"
+              >
+                <Key className="w-3.5 h-3.5" />
+                <span>Switch to Super Admin (Ananya Sharma)</span>
+              </button>
+            </div>
+          </div>
+        )
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 6: Role-Based Workflow Management & Access Limits */}
+      {/* ========================================================================= */}
+      {activeTab === 'roles_workflow' && (
+        <RoleWorkflowManagementTab
+          onSuccessToast={(msg) => {
+            setSuccessToast(msg);
+            setTimeout(() => setSuccessToast(null), 4000);
+          }}
+        />
       )}
 
       {/* ========================================================================= */}

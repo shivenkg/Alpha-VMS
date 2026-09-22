@@ -13,20 +13,24 @@ import {
   ScanLine,
   Sliders,
   Users,
-  AlertCircle
+  AlertCircle,
+  Clock
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { JSAlphaSoftLogo } from '../common/JSAlphaSoftLogo';
 import { AppUser } from '../../types';
+import { getInactivityLogoutNotice } from '../../hooks/useInactivityTimeout';
 
 interface LoginViewProps {
   onLoginSuccess: (user: AppUser) => void;
   onNavigateToPublicPreRegister?: () => void;
+  inactivityNotice?: string | null;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({
   onLoginSuccess,
   onNavigateToPublicPreRegister,
+  inactivityNotice: initialInactivityNotice,
 }) => {
   const state = storageService.getState();
   const [loginId, setLoginId] = useState('');
@@ -35,6 +39,9 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [rememberMe, setRememberMe] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [inactivityNotice, setInactivityNotice] = useState<string | null>(
+    () => initialInactivityNotice || getInactivityLogoutNotice()
+  );
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,6 +166,20 @@ export const LoginView: React.FC<LoginViewProps> = ({
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          {/* Enterprise Inactivity Logout Notice */}
+          {inactivityNotice && (
+            <div
+              id="enterprise-inactivity-notice-banner"
+              className="mb-4 p-3.5 rounded-xl bg-amber-50 border border-amber-300 flex items-start gap-2.5 text-xs text-amber-900 animate-fadeIn shadow-2xs"
+            >
+              <Clock className="w-4 h-4 shrink-0 mt-0.5 text-amber-700" />
+              <div className="flex-1">
+                <span className="font-bold block text-amber-950">Enterprise Session Timed Out</span>
+                <span className="text-amber-800 text-[11px] leading-relaxed">{inactivityNotice}</span>
+              </div>
+            </div>
+          )}
 
           {errorMessage && (
             <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 flex items-start gap-2.5 text-xs text-red-700 animate-fadeIn">

@@ -13,11 +13,14 @@ import {
   QrCode,
   Check,
   UserCheck,
-  Share2
+  Share2,
+  FileDown,
+  Loader2
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { Visit } from '../../types';
 import { VisitorQrPassModal } from '../common/VisitorQrPassModal';
+import { generateVisitorLogsPdf } from '../../utils/reportPdfGenerator';
 
 interface ReceptionViewProps {
   onSelectVisitForBadge: (visit: Visit) => void;
@@ -40,6 +43,19 @@ export const ReceptionView: React.FC<ReceptionViewProps> = ({
   const [isScannerActive, setIsScannerActive] = useState(false);
   const [scannedResult, setScannedResult] = useState<string | null>(null);
   const [selectedVisitForQrPass, setSelectedVisitForQrPass] = useState<Visit | null>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const activeTenant = storageService.getActiveTenant();
+
+  const handleDownloadLogsPdf = () => {
+    try {
+      setIsExportingPdf(true);
+      generateVisitorLogsPdf(siteVisits, activeTenant, activeSite, `RECEPTION VISITOR LOG REPORT • ${activeSite.name}`);
+    } catch (err) {
+      console.error('Failed to export visitor log PDF:', err);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   // Filter visits for current site
   const siteVisits = state.visits.filter((v) => v.siteId === state.activeSiteId);
@@ -138,6 +154,26 @@ export const ReceptionView: React.FC<ReceptionViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+          <button
+            id="download-visitor-log-pdf-btn"
+            onClick={handleDownloadLogsPdf}
+            disabled={isExportingPdf || siteVisits.length === 0}
+            className="border border-teal-600/40 bg-teal-50 text-teal-800 hover:bg-teal-100 px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+            title="Download today's full visitor activity log as formatted PDF"
+          >
+            {isExportingPdf ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-700" />
+                <span>Exporting...</span>
+              </>
+            ) : (
+              <>
+                <FileDown className="w-3.5 h-3.5 text-teal-700" />
+                <span>Download as PDF</span>
+              </>
+            )}
+          </button>
+
           {onOpenSharePreRegModal && (
             <button
               id="reception-share-prereg-btn"

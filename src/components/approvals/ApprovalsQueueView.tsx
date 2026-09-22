@@ -7,13 +7,17 @@ import {
   AlertTriangle,
   Clock,
   Building,
-  CheckCircle2
+  CheckCircle2,
+  FileDown,
+  Loader2
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { Visit } from '../../types';
+import { generateVisitorLogsPdf } from '../../utils/reportPdfGenerator';
 
 export const ApprovalsQueueView: React.FC = () => {
   const state = storageService.getState();
+  const activeTenant = storageService.getActiveTenant();
   const activeUser = storageService.getActiveUser();
   const activeSite = storageService.getActiveSite();
 
@@ -21,6 +25,7 @@ export const ApprovalsQueueView: React.FC = () => {
   const [rejectingVisitId, setRejectingVisitId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const siteVisits = state.visits.filter((v) => v.siteId === state.activeSiteId);
 
@@ -30,6 +35,22 @@ export const ApprovalsQueueView: React.FC = () => {
     if (filter === 'REJECTED') return v.state === 'REJECTED';
     return true;
   });
+
+  const handleDownloadPdf = () => {
+    try {
+      setIsExportingPdf(true);
+      generateVisitorLogsPdf(
+        filteredVisits.length > 0 ? filteredVisits : siteVisits,
+        activeTenant,
+        activeSite,
+        `VISITOR APPROVAL STATUS & AUDIT LOG • ${filter} VISITS`
+      );
+    } catch (err) {
+      console.error('Failed to generate approvals report PDF:', err);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   const handleApprove = (visitId: string, level: 'HOST' | 'DEPARTMENT' | 'SECURITY') => {
     const res = storageService.approveVisit(visitId, level);
@@ -70,47 +91,69 @@ export const ApprovalsQueueView: React.FC = () => {
           </p>
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center bg-[#F4F7FA] p-1 rounded-lg border border-[#D8E1E8] text-xs">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Filter Pills */}
+          <div className="flex items-center bg-[#F4F7FA] p-1 rounded-lg border border-[#D8E1E8] text-xs">
+            <button
+              onClick={() => setFilter('PENDING')}
+              className={`px-3 py-1.5 rounded-md font-semibold transition ${
+                filter === 'PENDING'
+                  ? 'bg-[#123B5D] text-white shadow-xs'
+                  : 'text-[#526575] hover:text-[#172B3A]'
+              }`}
+            >
+              Pending ({siteVisits.filter((v) => v.state === 'PENDING_APPROVAL').length})
+            </button>
+            <button
+              onClick={() => setFilter('APPROVED')}
+              className={`px-3 py-1.5 rounded-md font-semibold transition ${
+                filter === 'APPROVED'
+                  ? 'bg-[#123B5D] text-white shadow-xs'
+                  : 'text-[#526575] hover:text-[#172B3A]'
+              }`}
+            >
+              Approved ({siteVisits.filter((v) => v.state === 'APPROVED').length})
+            </button>
+            <button
+              onClick={() => setFilter('REJECTED')}
+              className={`px-3 py-1.5 rounded-md font-semibold transition ${
+                filter === 'REJECTED'
+                  ? 'bg-[#123B5D] text-white shadow-xs'
+                  : 'text-[#526575] hover:text-[#172B3A]'
+              }`}
+            >
+              Rejected ({siteVisits.filter((v) => v.state === 'REJECTED').length})
+            </button>
+            <button
+              onClick={() => setFilter('ALL')}
+              className={`px-3 py-1.5 rounded-md font-semibold transition ${
+                filter === 'ALL'
+                  ? 'bg-[#123B5D] text-white shadow-xs'
+                  : 'text-[#526575] hover:text-[#172B3A]'
+              }`}
+            >
+              All Visits
+            </button>
+          </div>
+
           <button
-            onClick={() => setFilter('PENDING')}
-            className={`px-3 py-1.5 rounded-md font-semibold transition ${
-              filter === 'PENDING'
-                ? 'bg-[#123B5D] text-white shadow-xs'
-                : 'text-[#526575] hover:text-[#172B3A]'
-            }`}
+            id="approvals-download-visitor-pdf-btn"
+            onClick={handleDownloadPdf}
+            disabled={isExportingPdf || filteredVisits.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-semibold transition cursor-pointer shadow-2xs disabled:opacity-50 shrink-0"
+            title="Download formatted visitor approvals list as PDF document"
           >
-            Pending ({siteVisits.filter((v) => v.state === 'PENDING_APPROVAL').length})
-          </button>
-          <button
-            onClick={() => setFilter('APPROVED')}
-            className={`px-3 py-1.5 rounded-md font-semibold transition ${
-              filter === 'APPROVED'
-                ? 'bg-[#123B5D] text-white shadow-xs'
-                : 'text-[#526575] hover:text-[#172B3A]'
-            }`}
-          >
-            Approved ({siteVisits.filter((v) => v.state === 'APPROVED').length})
-          </button>
-          <button
-            onClick={() => setFilter('REJECTED')}
-            className={`px-3 py-1.5 rounded-md font-semibold transition ${
-              filter === 'REJECTED'
-                ? 'bg-[#123B5D] text-white shadow-xs'
-                : 'text-[#526575] hover:text-[#172B3A]'
-            }`}
-          >
-            Rejected ({siteVisits.filter((v) => v.state === 'REJECTED').length})
-          </button>
-          <button
-            onClick={() => setFilter('ALL')}
-            className={`px-3 py-1.5 rounded-md font-semibold transition ${
-              filter === 'ALL'
-                ? 'bg-[#123B5D] text-white shadow-xs'
-                : 'text-[#526575] hover:text-[#172B3A]'
-            }`}
-          >
-            All Visits
+            {isExportingPdf ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-700" />
+                <span>Exporting...</span>
+              </>
+            ) : (
+              <>
+                <FileDown className="w-3.5 h-3.5 text-teal-700" />
+                <span>Download as PDF</span>
+              </>
+            )}
           </button>
         </div>
       </div>

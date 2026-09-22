@@ -5,6 +5,7 @@ import {
   Gate,
   Department,
   AppUser,
+  UserRole,
   VisitorProfile,
   VisitorCategory,
   Visit,
@@ -16,7 +17,9 @@ import {
   UATTestCase,
   UserPreferences,
   HostNotificationSettings,
-  GoogleSheetConfig
+  GoogleSheetConfig,
+  VMSFunctionId,
+  VMSFunctionDefinition
 } from '../types';
 import {
   INITIAL_TENANTS,
@@ -66,7 +69,242 @@ interface VMSState {
     instructions: string;
   };
   preferences?: UserPreferences;
+  googleSheetConfig?: GoogleSheetConfig;
+  rolePermissions?: Record<UserRole, VMSFunctionId[]>;
+  userRestrictedFunctions?: Record<string, VMSFunctionId[]>;
 }
+
+export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, VMSFunctionId[]> = {
+  PLATFORM_SUPER_ADMIN: [
+    'RECEPTION_DESK',
+    'VISITOR_DIRECTORY',
+    'INVITATIONS_PREREG',
+    'SECURITY_APPROVALS',
+    'BADGE_PRINTING',
+    'PASS_DESIGNER',
+    'EMERGENCY_ROLLCALL',
+    'HARDWARE_DEVICES',
+    'EDGE_OFFLINE_SYNC',
+    'ANALYTICS_REPORTS',
+    'AUDIT_TRAIL',
+    'USER_MANAGEMENT',
+    'TENANT_PROVISIONING',
+    'GOOGLE_SHEETS_SYNC',
+    'ROLE_PERMISSIONS',
+  ],
+  TENANT_ADMIN: [
+    'RECEPTION_DESK',
+    'VISITOR_DIRECTORY',
+    'INVITATIONS_PREREG',
+    'SECURITY_APPROVALS',
+    'BADGE_PRINTING',
+    'EMERGENCY_ROLLCALL',
+    'HARDWARE_DEVICES',
+    'EDGE_OFFLINE_SYNC',
+    'ANALYTICS_REPORTS',
+    'AUDIT_TRAIL',
+    'USER_MANAGEMENT',
+    'TENANT_PROVISIONING',
+    'GOOGLE_SHEETS_SYNC',
+    'ROLE_PERMISSIONS',
+  ],
+  SITE_ADMIN: [
+    'RECEPTION_DESK',
+    'VISITOR_DIRECTORY',
+    'INVITATIONS_PREREG',
+    'SECURITY_APPROVALS',
+    'BADGE_PRINTING',
+    'EMERGENCY_ROLLCALL',
+    'HARDWARE_DEVICES',
+    'EDGE_OFFLINE_SYNC',
+    'ANALYTICS_REPORTS',
+    'AUDIT_TRAIL',
+    'USER_MANAGEMENT',
+    'GOOGLE_SHEETS_SYNC',
+  ],
+  TENANT_SECURITY_ADMIN: [
+    'RECEPTION_DESK',
+    'VISITOR_DIRECTORY',
+    'SECURITY_APPROVALS',
+    'BADGE_PRINTING',
+    'EMERGENCY_ROLLCALL',
+    'HARDWARE_DEVICES',
+    'AUDIT_TRAIL',
+  ],
+  GATE_SUPERVISOR: [
+    'RECEPTION_DESK',
+    'VISITOR_DIRECTORY',
+    'SECURITY_APPROVALS',
+    'BADGE_PRINTING',
+    'EMERGENCY_ROLLCALL',
+    'HARDWARE_DEVICES',
+  ],
+  SECURITY_GUARD: [
+    'RECEPTION_DESK',
+    'SECURITY_APPROVALS',
+    'BADGE_PRINTING',
+    'EMERGENCY_ROLLCALL',
+  ],
+  RECEPTIONIST: [
+    'RECEPTION_DESK',
+    'VISITOR_DIRECTORY',
+    'INVITATIONS_PREREG',
+    'BADGE_PRINTING',
+  ],
+  HOST_EMPLOYEE: [
+    'INVITATIONS_PREREG',
+    'SECURITY_APPROVALS',
+  ],
+  DEPARTMENT_APPROVER: [
+    'SECURITY_APPROVALS',
+    'INVITATIONS_PREREG',
+  ],
+  COMPLIANCE_AUDITOR: [
+    'AUDIT_TRAIL',
+    'VISITOR_DIRECTORY',
+    'ANALYTICS_REPORTS',
+  ],
+  DEVICE_EDGE_ADMIN: [
+    'HARDWARE_DEVICES',
+    'EDGE_OFFLINE_SYNC',
+    'BADGE_PRINTING',
+    'EMERGENCY_ROLLCALL',
+  ],
+};
+
+export const VMS_FUNCTION_DEFINITIONS: VMSFunctionDefinition[] = [
+  {
+    id: 'RECEPTION_DESK',
+    name: 'Reception & Desk Check-In',
+    category: 'OPERATIONS',
+    description: 'Walk-in visitor registration, fast badge check-in, turnstile check-out, and visitor identity verification.',
+    associatedViews: ['reception', 'walkin'],
+  },
+  {
+    id: 'VISITOR_DIRECTORY',
+    name: 'Visitor Master Directory',
+    category: 'OPERATIONS',
+    description: 'Search visitor profiles, view historic visits, access contact details, and export formatted PDF activity reports.',
+    associatedViews: ['visitors'],
+  },
+  {
+    id: 'INVITATIONS_PREREG',
+    name: 'Invitations & Pre-Registration',
+    category: 'OPERATIONS',
+    description: 'Send digital visitor passes, generate pre-registration links, and approve advance guest appointments.',
+    associatedViews: ['invitations', 'pre_register'],
+  },
+  {
+    id: 'SECURITY_APPROVALS',
+    name: 'Multi-Level Security Approvals',
+    category: 'SECURITY_GOVERNANCE',
+    description: 'Host pre-verification, Department lead authorization, and physical security gate pre-clearance.',
+    associatedViews: ['approvals'],
+  },
+  {
+    id: 'BADGE_PRINTING',
+    name: 'Thermal Badge Printing & Spooler',
+    category: 'OPERATIONS',
+    description: 'Send print jobs to Zebra / Brother printers, issue physical cards, and process reprint requests.',
+    associatedViews: ['badges'],
+  },
+  {
+    id: 'PASS_DESIGNER',
+    name: 'Visitor Pass & Badge Designer',
+    category: 'ADMINISTRATION',
+    description: 'Design physical and digital pass templates, configure QR codes, dimensions, branding colors, and safety disclaimers.',
+    associatedViews: ['admin_hub'],
+  },
+  {
+    id: 'EMERGENCY_ROLLCALL',
+    name: 'Emergency Alarm & Evacuation Roll Call',
+    category: 'SAFETY_EMERGENCY',
+    description: 'Trigger facility emergency broadcasts, muster point roll call accountability, and export first-responder rosters.',
+    associatedViews: ['emergency'],
+  },
+  {
+    id: 'HARDWARE_DEVICES',
+    name: 'Hardware & Turnstile Controllers',
+    category: 'INFRASTRUCTURE',
+    description: 'Monitor IoT gate turnstiles, thermal printers, barcode scanners, and self-service kiosks.',
+    associatedViews: ['devices'],
+  },
+  {
+    id: 'EDGE_OFFLINE_SYNC',
+    name: 'Edge Offline Store-and-Forward',
+    category: 'INFRASTRUCTURE',
+    description: 'Manage local edge caching, offline check-in buffering, and cryptographic sync reconciliation.',
+    associatedViews: ['edge'],
+  },
+  {
+    id: 'ANALYTICS_REPORTS',
+    name: 'Facility Intelligence & Reports',
+    category: 'OPERATIONS',
+    description: 'Access visitor traffic heatmaps, dwell times, peak arrival charts, and compliance metrics.',
+    associatedViews: ['reports'],
+  },
+  {
+    id: 'AUDIT_TRAIL',
+    name: 'Forensic Audit Trail & Forensics',
+    category: 'SECURITY_GOVERNANCE',
+    description: 'Inspect tamper-evident chronological security logs, cryptographic hash chains, and export audit PDF reports.',
+    associatedViews: ['audit'],
+  },
+  {
+    id: 'USER_MANAGEMENT',
+    name: 'User Accounts & Login ID Provisioning',
+    category: 'ADMINISTRATION',
+    description: 'Create user credentials, assign roles, enforce MFA, and manage departmental scopes.',
+    associatedViews: ['iam', 'user_management'],
+  },
+  {
+    id: 'TENANT_PROVISIONING',
+    name: 'Multi-Tenant Isolation & Provisioning',
+    category: 'ADMINISTRATION',
+    description: 'Create and configure tenant shards, security retention policies, and corporate branding customization.',
+    associatedViews: ['tenants', 'tenant_provisioning', 'customization'],
+  },
+  {
+    id: 'GOOGLE_SHEETS_SYNC',
+    name: 'Google Sheets 2-Way Synchronization',
+    category: 'ADMINISTRATION',
+    description: 'Automate live syncing of visitor activity logs directly to connected corporate Google Sheets spreadsheets.',
+    associatedViews: ['admin_hub'],
+  },
+  {
+    id: 'ROLE_PERMISSIONS',
+    name: 'Role-Based Workflow & Access Limiting',
+    category: 'ADMINISTRATION',
+    description: 'Grant and revoke operational functions from system roles and enforce custom access limitations on individual users.',
+    associatedViews: ['admin_hub'],
+  },
+];
+
+export const DEFAULT_GOOGLE_SHEET_CONFIG: GoogleSheetConfig = {
+  enabled: true,
+  spreadsheetId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
+  spreadsheetUrl: 'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit',
+  sheetName: 'Visitor_Logs_2026',
+  syncMode: 'REALTIME_CHECKIN',
+  autoSyncOnCheckIn: true,
+  autoSyncOnCheckOut: true,
+  serviceAccountEmail: 'vms-sync-service@js-alphasoft-enterprise.iam.gserviceaccount.com',
+  webhookAppsScriptUrl: 'https://script.google.com/macros/s/AKfycbz_vms_sync_2026/exec',
+  lastSyncedAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+  totalRowsSynced: 148,
+  syncStatus: 'CONNECTED',
+  fieldsToSync: {
+    visitorName: true,
+    company: true,
+    hostName: true,
+    department: true,
+    checkInTime: true,
+    checkOutTime: true,
+    badgeNumber: true,
+    state: true,
+    securityClearance: true,
+  },
+};
 
 const DEFAULT_USER_PREFERENCES: UserPreferences = {
   autoPrintBadgesOnCheckIn: true,
@@ -94,6 +332,30 @@ class VMSStorageService {
         if (!parsed.preferences) {
           parsed.preferences = { ...DEFAULT_USER_PREFERENCES };
         }
+        if (!parsed.googleSheetConfig) {
+          parsed.googleSheetConfig = { ...DEFAULT_GOOGLE_SHEET_CONFIG };
+        }
+        if (!parsed.rolePermissions) {
+          parsed.rolePermissions = { ...DEFAULT_ROLE_PERMISSIONS };
+        } else {
+          // Strictly enforce that PASS_DESIGNER is restricted to PLATFORM_SUPER_ADMIN only
+          for (const roleKey of Object.keys(parsed.rolePermissions)) {
+            if (roleKey !== 'PLATFORM_SUPER_ADMIN') {
+              parsed.rolePermissions[roleKey] = (parsed.rolePermissions[roleKey] || []).filter(
+                (f: string) => f !== 'PASS_DESIGNER'
+              );
+            }
+          }
+          if (!parsed.rolePermissions.PLATFORM_SUPER_ADMIN?.includes('PASS_DESIGNER')) {
+            parsed.rolePermissions.PLATFORM_SUPER_ADMIN = [
+              ...(parsed.rolePermissions.PLATFORM_SUPER_ADMIN || []),
+              'PASS_DESIGNER',
+            ];
+          }
+        }
+        if (!parsed.userRestrictedFunctions) {
+          parsed.userRestrictedFunctions = {};
+        }
         // Verify tenant ID is from the Indian dataset
         if (parsed.activeTenantId && parsed.activeTenantId.includes('tata')) {
           return parsed;
@@ -105,6 +367,9 @@ class VMSStorageService {
 
     return {
       preferences: { ...DEFAULT_USER_PREFERENCES },
+      googleSheetConfig: { ...DEFAULT_GOOGLE_SHEET_CONFIG },
+      rolePermissions: { ...DEFAULT_ROLE_PERMISSIONS },
+      userRestrictedFunctions: {},
       tenants: INITIAL_TENANTS,
       sites: INITIAL_SITES,
       zones: INITIAL_ZONES,
@@ -138,7 +403,7 @@ class VMSStorageService {
       activeTenantId: 'ten-tata-01',
       activeSiteId: 'site-blr-01',
       activeGateId: 'gate-blr-main',
-      activeUserId: 'usr-priya', // default to receptionist for active desk operations
+      activeUserId: 'usr-ananya', // default to platform super admin for full administration center hub access
       isEdgeOnline: true,
       isEmergencyActive: false,
     };
@@ -156,6 +421,17 @@ class VMSStorageService {
   public subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  public notifySubscribers() {
+    this.notify();
+  }
+
+  public forceRefreshState(): VMSState {
+    const fresh = this.loadState();
+    this.state = fresh;
+    this.notify();
+    return this.state;
   }
 
   private notify() {
@@ -932,6 +1208,13 @@ class VMSStorageService {
     this.state.isEmergencyActive = active;
     this.state.emergencyAlertDetails = active ? details : undefined;
 
+    if (!active) {
+      // Clear roll call accountability marks on all visits upon declaring all clear
+      this.state.visits.forEach((v) => {
+        v.isAccountedForInEmergency = false;
+      });
+    }
+
     this.logAuditEvent({
       eventType: active ? 'EMERGENCY_EVACUATION_ACTIVATED' : 'EMERGENCY_EVACUATION_ALL_CLEAR',
       action: 'EMERGENCY_TRIGGER',
@@ -943,6 +1226,141 @@ class VMSStorageService {
     });
 
     this.saveState();
+  }
+
+  public markAllVisitorsAccountedInEmergency(accounted: boolean = true, siteId?: string) {
+    const targetSiteId = siteId || this.state.activeSiteId;
+    this.state.visits.forEach((v) => {
+      if (v.siteId === targetSiteId && v.state === 'CHECKED_IN') {
+        v.isAccountedForInEmergency = accounted;
+      }
+    });
+    this.saveState();
+  }
+
+  public seedDrillVisitorsIfEmpty(siteId?: string) {
+    const targetSiteId = siteId || this.state.activeSiteId;
+    const existing = this.state.visits.filter((v) => v.siteId === targetSiteId && v.state === 'CHECKED_IN');
+    if (existing.length === 0) {
+      const now = new Date();
+      const activeSiteObj = this.state.sites.find((s) => s.id === targetSiteId);
+      const activeGateObj = this.state.gates.find((g) => g.id === this.state.activeGateId);
+      const siteName = activeSiteObj?.name || 'Main Facility';
+      const gateName = activeGateObj?.name || 'Main Reception Gate';
+
+      const mockDrillVisitors: Visit[] = [
+        {
+          id: `vst-drill-${Date.now()}-1`,
+          tenantId: this.state.activeTenantId,
+          siteId: targetSiteId,
+          siteName,
+          gateId: this.state.activeGateId,
+          gateName,
+          visitorId: 'vis-001',
+          visitorName: 'Aditya Deshpande',
+          visitorCompany: 'Infosys Consulting',
+          visitorCategory: 'BUSINESS_GUEST',
+          hostUserId: 'usr-rajesh',
+          hostName: 'Dr. Rajesh Sengupta',
+          departmentId: 'dept-eng',
+          departmentName: 'Hardware & Cloud Infrastructure Engineering',
+          purpose: 'Facility Evacuation Preparedness Audit & Drill',
+          scheduledStart: new Date(now.getTime() - 90 * 60000).toISOString(),
+          scheduledEnd: new Date(now.getTime() + 180 * 60000).toISOString(),
+          actualCheckIn: new Date(now.getTime() - 45 * 60000).toISOString(),
+          badgeNumber: 'BDG-9901',
+          state: 'CHECKED_IN',
+          passToken: 'PASS-DRILL-01',
+          passTokenExpiresAt: new Date(now.getTime() + 24 * 3600000).toISOString(),
+          assignedZone: 'Building A - Tier 3 Data Hall',
+          musterPoint: 'North Lawn Muster Point #1',
+          isAccountedForInEmergency: false,
+          approvalStatus: {
+            hostApproved: true,
+            hostApprovedAt: new Date(now.getTime() - 100 * 60000).toISOString(),
+            departmentApproved: true,
+            departmentApprovedAt: new Date(now.getTime() - 95 * 60000).toISOString(),
+            securityApproved: true,
+            securityApprovedAt: new Date(now.getTime() - 90 * 60000).toISOString(),
+          },
+          createdAt: new Date(now.getTime() - 120 * 60000).toISOString(),
+        },
+        {
+          id: `vst-drill-${Date.now()}-2`,
+          tenantId: this.state.activeTenantId,
+          siteId: targetSiteId,
+          siteName,
+          gateId: this.state.activeGateId,
+          gateName,
+          visitorId: 'vis-002',
+          visitorName: 'Meera Nambiar',
+          visitorCompany: 'Deloitte Risk Advisory',
+          visitorCategory: 'VIP_EXECUTIVE',
+          hostUserId: 'usr-pooja',
+          hostName: 'Pooja Deshmukh',
+          departmentId: 'dept-exec',
+          departmentName: 'Executive Wing',
+          purpose: 'Quarterly Risk & Safety Compliance Review',
+          scheduledStart: new Date(now.getTime() - 60 * 60000).toISOString(),
+          scheduledEnd: new Date(now.getTime() + 120 * 60000).toISOString(),
+          actualCheckIn: new Date(now.getTime() - 25 * 60000).toISOString(),
+          badgeNumber: 'BDG-9902',
+          state: 'CHECKED_IN',
+          passToken: 'PASS-DRILL-02',
+          passTokenExpiresAt: new Date(now.getTime() + 24 * 3600000).toISOString(),
+          assignedZone: 'Floor 4 - Executive Suite',
+          musterPoint: 'West Parking Assembly Zone #2',
+          isAccountedForInEmergency: false,
+          approvalStatus: {
+            hostApproved: true,
+            hostApprovedAt: new Date(now.getTime() - 80 * 60000).toISOString(),
+            departmentApproved: true,
+            departmentApprovedAt: new Date(now.getTime() - 75 * 60000).toISOString(),
+            securityApproved: true,
+            securityApprovedAt: new Date(now.getTime() - 70 * 60000).toISOString(),
+          },
+          createdAt: new Date(now.getTime() - 90 * 60000).toISOString(),
+        },
+        {
+          id: `vst-drill-${Date.now()}-3`,
+          tenantId: this.state.activeTenantId,
+          siteId: targetSiteId,
+          siteName,
+          gateId: this.state.activeGateId,
+          gateName,
+          visitorId: 'vis-003',
+          visitorName: 'Tariq Al-Mansoor',
+          visitorCompany: 'Schneider Electric Services',
+          visitorCategory: 'CONTRACTOR',
+          hostUserId: 'usr-vikram',
+          hostName: 'Vikramaditya Chauhan',
+          departmentId: 'dept-fac',
+          departmentName: 'Facilities & BMS',
+          purpose: 'Substation Fire Suppression Systems Check',
+          scheduledStart: new Date(now.getTime() - 120 * 60000).toISOString(),
+          scheduledEnd: new Date(now.getTime() + 240 * 60000).toISOString(),
+          actualCheckIn: new Date(now.getTime() - 60 * 60000).toISOString(),
+          badgeNumber: 'BDG-9903',
+          state: 'CHECKED_IN',
+          passToken: 'PASS-DRILL-03',
+          passTokenExpiresAt: new Date(now.getTime() + 24 * 3600000).toISOString(),
+          assignedZone: 'Substation B - Power Ingress',
+          musterPoint: 'South Main Gate Assembly Zone #4',
+          isAccountedForInEmergency: false,
+          approvalStatus: {
+            hostApproved: true,
+            hostApprovedAt: new Date(now.getTime() - 130 * 60000).toISOString(),
+            departmentApproved: true,
+            departmentApprovedAt: new Date(now.getTime() - 125 * 60000).toISOString(),
+            securityApproved: true,
+            securityApprovedAt: new Date(now.getTime() - 120 * 60000).toISOString(),
+          },
+          createdAt: new Date(now.getTime() - 140 * 60000).toISOString(),
+        },
+      ];
+      this.state.visits.push(...mockDrillVisitors);
+      this.saveState();
+    }
   }
 
   public updateEmergencyAccountability(visitId: string, accountedFor: boolean) {
@@ -1345,6 +1763,241 @@ class VMSStorageService {
       t.evidence = `Execution trace: [CORR-${Math.random().toString(36).substring(2, 8).toUpperCase()}] Status HTTP 200/403/401 matching spec. Audit hash verified.`;
     });
     this.saveState();
+  }
+
+  public getGoogleSheetConfig(): GoogleSheetConfig {
+    if (!this.state.googleSheetConfig) {
+      this.state.googleSheetConfig = { ...DEFAULT_GOOGLE_SHEET_CONFIG };
+    }
+    return this.state.googleSheetConfig;
+  }
+
+  public updateGoogleSheetConfig(updates: Partial<GoogleSheetConfig>): GoogleSheetConfig {
+    const current = this.getGoogleSheetConfig();
+    this.state.googleSheetConfig = { ...current, ...updates };
+    this.saveState();
+    return this.state.googleSheetConfig;
+  }
+
+  public syncWithGoogleSheet(): { success: boolean; rowsSynced: number; timestamp: string } {
+    const cfg = this.getGoogleSheetConfig();
+    const rows = this.state.visits.length;
+    cfg.syncStatus = 'SYNCING';
+    this.saveState();
+
+    const timestamp = new Date().toISOString();
+    cfg.syncStatus = 'CONNECTED';
+    cfg.lastSyncedAt = timestamp;
+    cfg.totalRowsSynced = (cfg.totalRowsSynced || 0) + rows;
+    this.saveState();
+
+    this.logAuditEvent({
+      eventType: 'GOOGLE_SHEET_SYNC',
+      action: 'SYNC_GOOGLE_SHEET',
+      entityType: 'SECURITY',
+      entityId: cfg.spreadsheetId || 'GOOGLE_SHEETS',
+      details: `Synchronized ${rows} visitor activity records with Google Sheet: "${cfg.sheetName}".`,
+    });
+
+    return { success: true, rowsSynced: rows, timestamp };
+  }
+
+  // ----------------------------------------------------
+  // ROLE-BASED WORKFLOW & FUNCTION MANAGEMENT
+  // ----------------------------------------------------
+  public getRolePermissions(role: UserRole): VMSFunctionId[] {
+    if (!this.state.rolePermissions) {
+      this.state.rolePermissions = { ...DEFAULT_ROLE_PERMISSIONS };
+    }
+    return this.state.rolePermissions[role] || DEFAULT_ROLE_PERMISSIONS[role] || [];
+  }
+
+  public getAllRolePermissions(): Record<UserRole, VMSFunctionId[]> {
+    if (!this.state.rolePermissions) {
+      this.state.rolePermissions = { ...DEFAULT_ROLE_PERMISSIONS };
+    }
+    return { ...this.state.rolePermissions };
+  }
+
+  public updateRolePermissions(role: UserRole, functions: VMSFunctionId[]): { success: boolean } {
+    if (!this.state.rolePermissions) {
+      this.state.rolePermissions = { ...DEFAULT_ROLE_PERMISSIONS };
+    }
+    const previous = this.state.rolePermissions[role] || [];
+    this.state.rolePermissions[role] = functions;
+    this.saveState();
+
+    this.logAuditEvent({
+      eventType: 'ROLE_POLICY_MODIFIED',
+      action: 'UPDATE_ROLE_PERMISSIONS',
+      entityType: 'SECURITY',
+      entityId: `ROLE_${role}`,
+      details: `Updated permissions for role ${role}: ${functions.length} functions active (previously ${previous.length}).`,
+    });
+
+    return { success: true };
+  }
+
+  public addFunctionToRole(role: UserRole, fnId: VMSFunctionId): { success: boolean } {
+    const current = this.getRolePermissions(role);
+    if (!current.includes(fnId)) {
+      return this.updateRolePermissions(role, [...current, fnId]);
+    }
+    return { success: true };
+  }
+
+  public removeFunctionFromRole(role: UserRole, fnId: VMSFunctionId): { success: boolean } {
+    const current = this.getRolePermissions(role);
+    return this.updateRolePermissions(role, current.filter((f) => f !== fnId));
+  }
+
+  // ----------------------------------------------------
+  // USER-LEVEL ACCESS LIMITATIONS
+  // ----------------------------------------------------
+  public getUserRestrictedFunctions(userId: string): VMSFunctionId[] {
+    if (!this.state.userRestrictedFunctions) {
+      this.state.userRestrictedFunctions = {};
+    }
+    return this.state.userRestrictedFunctions[userId] || [];
+  }
+
+  public updateUserAccessLimit(userId: string, blockedFunctionIds: VMSFunctionId[]): { success: boolean } {
+    if (!this.state.userRestrictedFunctions) {
+      this.state.userRestrictedFunctions = {};
+    }
+    this.state.userRestrictedFunctions[userId] = blockedFunctionIds;
+    this.saveState();
+
+    const targetUser = this.state.users.find((u) => u.id === userId);
+    this.logAuditEvent({
+      eventType: 'USER_ACCESS_LIMITED',
+      action: 'RESTRICT_USER_PERMISSIONS',
+      entityType: 'SECURITY',
+      entityId: userId,
+      details: `Enforced custom access limits on ${targetUser ? targetUser.name : userId}: ${blockedFunctionIds.length} functions restricted.`,
+    });
+
+    return { success: true };
+  }
+
+  public getUserEffectivePermissions(userId: string): VMSFunctionId[] {
+    const user = this.state.users.find((u) => u.id === userId);
+    if (!user) return [];
+    if (user.status === 'INACTIVE') return [];
+
+    const roleFns = this.getRolePermissions(user.role);
+    const restrictedFns = this.getUserRestrictedFunctions(userId);
+    return roleFns.filter((fn) => !restrictedFns.includes(fn));
+  }
+
+  public hasFunctionAccess(userId: string, functionId: VMSFunctionId): boolean {
+    const user = this.state.users.find((u) => u.id === userId);
+    if (!user) return false;
+    if (user.status === 'INACTIVE') return false;
+
+    const restrictedFns = this.getUserRestrictedFunctions(userId);
+    if (restrictedFns.includes(functionId)) return false;
+
+    const roleFns = this.getRolePermissions(user.role);
+    return roleFns.includes(functionId);
+  }
+
+  public updateUserRole(userId: string, newRole: UserRole): { success: boolean; user?: AppUser } {
+    const user = this.state.users.find((u) => u.id === userId);
+    if (!user) return { success: false };
+
+    const oldRole = user.role;
+    user.role = newRole;
+    this.saveState();
+
+    this.logAuditEvent({
+      eventType: 'USER_ROLE_CHANGED',
+      action: 'UPDATE_USER_ROLE',
+      entityType: 'SECURITY',
+      entityId: userId,
+      previousState: oldRole,
+      newState: newRole,
+      details: `User ${user.name} (${user.loginId}) role changed from ${oldRole} to ${newRole}.`,
+    });
+
+    return { success: true, user };
+  }
+
+  public toggleUserStatus(userId: string, newStatus: 'ACTIVE' | 'INACTIVE'): { success: boolean; user?: AppUser } {
+    const user = this.state.users.find((u) => u.id === userId);
+    if (!user) return { success: false };
+
+    const oldStatus = user.status;
+    user.status = newStatus;
+    this.saveState();
+
+    this.logAuditEvent({
+      eventType: 'USER_STATUS_TOGGLED',
+      action: newStatus === 'ACTIVE' ? 'ACTIVATE_USER' : 'SUSPEND_USER',
+      entityType: 'SECURITY',
+      entityId: userId,
+      previousState: oldStatus,
+      newState: newStatus,
+      details: `User ${user.name} (${user.loginId}) access status changed to ${newStatus}.`,
+    });
+
+    return { success: true, user };
+  }
+
+  // ----------------------------------------------------
+  // VISITOR PASS & BADGE TEMPLATE DESIGNER
+  // ----------------------------------------------------
+  public getBadgeTemplates(): BadgeTemplate[] {
+    if (!this.state.badgeTemplates || this.state.badgeTemplates.length === 0) {
+      this.state.badgeTemplates = [...INITIAL_BADGE_TEMPLATES];
+    }
+    return this.state.badgeTemplates;
+  }
+
+  public getBadgeTemplateById(templateId: string): BadgeTemplate | undefined {
+    return this.getBadgeTemplates().find((t) => t.id === templateId);
+  }
+
+  public saveBadgeTemplate(template: BadgeTemplate): { success: boolean; template: BadgeTemplate } {
+    if (!this.state.badgeTemplates) {
+      this.state.badgeTemplates = [...INITIAL_BADGE_TEMPLATES];
+    }
+    const idx = this.state.badgeTemplates.findIndex((t) => t.id === template.id);
+    if (idx >= 0) {
+      this.state.badgeTemplates[idx] = { ...template };
+    } else {
+      this.state.badgeTemplates.push({ ...template });
+    }
+    this.saveState();
+
+    this.logAuditEvent({
+      eventType: 'PASS_TEMPLATE_SAVED',
+      action: idx >= 0 ? 'UPDATE_PASS_TEMPLATE' : 'CREATE_PASS_TEMPLATE',
+      entityType: 'BADGE',
+      entityId: template.id,
+      details: `Visitor pass template "${template.name}" (${template.type}) configured and saved by administrator.`,
+    });
+
+    return { success: true, template };
+  }
+
+  public deleteBadgeTemplate(templateId: string): { success: boolean } {
+    if (!this.state.badgeTemplates) return { success: false };
+    if (this.state.badgeTemplates.length <= 1) {
+      return { success: false }; // Prevent deleting last remaining template
+    }
+    this.state.badgeTemplates = this.state.badgeTemplates.filter((t) => t.id !== templateId);
+    this.saveState();
+
+    this.logAuditEvent({
+      eventType: 'PASS_TEMPLATE_DELETED',
+      action: 'DELETE_PASS_TEMPLATE',
+      entityType: 'BADGE',
+      entityId: templateId,
+      details: `Visitor pass template ${templateId} removed by administrator.`,
+    });
+
+    return { success: true };
   }
 }
 

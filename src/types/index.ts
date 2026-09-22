@@ -245,19 +245,62 @@ export interface UserPreferences {
   promptBeforePrint: boolean;
 }
 
+export type VMSFunctionId =
+  | 'RECEPTION_DESK'
+  | 'VISITOR_DIRECTORY'
+  | 'INVITATIONS_PREREG'
+  | 'SECURITY_APPROVALS'
+  | 'BADGE_PRINTING'
+  | 'PASS_DESIGNER'
+  | 'EMERGENCY_ROLLCALL'
+  | 'HARDWARE_DEVICES'
+  | 'EDGE_OFFLINE_SYNC'
+  | 'ANALYTICS_REPORTS'
+  | 'AUDIT_TRAIL'
+  | 'USER_MANAGEMENT'
+  | 'TENANT_PROVISIONING'
+  | 'GOOGLE_SHEETS_SYNC'
+  | 'ROLE_PERMISSIONS';
+
+export interface VMSFunctionDefinition {
+  id: VMSFunctionId;
+  name: string;
+  category: 'OPERATIONS' | 'SECURITY_GOVERNANCE' | 'SAFETY_EMERGENCY' | 'INFRASTRUCTURE' | 'ADMINISTRATION';
+  description: string;
+  associatedViews: NavViewId[];
+}
+
 export interface BadgeTemplate {
   id: string;
   tenantId: string;
   name: string;
-  type: 'CR80_CARD' | 'ADHESIVE_LABEL' | 'CONFERENCE_PASS';
+  type: 'CR80_CARD' | 'ADHESIVE_LABEL' | 'CONFERENCE_PASS' | 'MOBILE_WALLET_PASS';
   widthMm: number;
   heightMm: number;
   showPhoto: boolean;
   showQrCode: boolean;
+  showBarcode?: boolean;
   showHost: boolean;
   showCategoryColor: boolean;
+  showHeaderLogo?: boolean;
+  showMusterPoint?: boolean;
+  showExpiryTime?: boolean;
   headerBackground: string;
+  headerTextColor?: string;
+  accentBorderColor?: string;
   instructions: string;
+  backsideDisclaimer?: string;
+  badgeLayoutOrientation?: 'PORTRAIT' | 'LANDSCAPE';
+  watermarkText?: string;
+  thermalSettings?: {
+    printerBrand?: 'ZEBRA' | 'BROTHER' | 'DYMO' | 'TSC';
+    darknessLevel?: number;
+    printSpeedIps?: number;
+    cutterMode?: 'TEAR_OFF' | 'AUTO_CUT' | 'PEEL_SENSOR';
+    resolutionDpi?: 203 | 300;
+    monochromeDither?: boolean;
+    selfExpiringVoidPreview?: boolean;
+  };
 }
 
 export interface BadgePrintJob {

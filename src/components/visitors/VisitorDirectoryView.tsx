@@ -9,10 +9,13 @@ import {
   Calendar,
   AlertTriangle,
   Lock,
-  Plus
+  Plus,
+  FileDown,
+  Loader2
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { VisitorProfile } from '../../types';
+import { generateVisitorLogsPdf } from '../../utils/reportPdfGenerator';
 
 interface VisitorDirectoryViewProps {
   onInviteVisitor: (visitor: VisitorProfile) => void;
@@ -20,8 +23,36 @@ interface VisitorDirectoryViewProps {
 
 export const VisitorDirectoryView: React.FC<VisitorDirectoryViewProps> = ({ onInviteVisitor }) => {
   const state = storageService.getState();
+  const activeTenant = storageService.getActiveTenant();
+  const activeSite = storageService.getActiveSite();
   const [search, setSearch] = useState('');
   const [selectedVisitor, setSelectedVisitor] = useState<VisitorProfile | null>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const handleDownloadPdf = () => {
+    try {
+      setIsExportingPdf(true);
+      const q = search.trim().toLowerCase();
+      const visitsToExport = q
+        ? state.visits.filter(
+            (v) =>
+              v.visitorName.toLowerCase().includes(q) ||
+              (v.visitorCompany && v.visitorCompany.toLowerCase().includes(q)) ||
+              (v.hostName && v.hostName.toLowerCase().includes(q))
+          )
+        : state.visits;
+      generateVisitorLogsPdf(
+        visitsToExport.length > 0 ? visitsToExport : state.visits,
+        activeTenant,
+        activeSite,
+        q ? `OFFICIAL VISITOR LOG REPORT • FILTER: "${search.trim().toUpperCase()}"` : 'OFFICIAL VISITOR MASTER DIRECTORY & LOG REPORT'
+      );
+    } catch (err) {
+      console.error('Failed to generate visitor logs PDF:', err);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   const filteredVisitors = state.visitors.filter((v) => {
     return (
@@ -57,6 +88,26 @@ export const VisitorDirectoryView: React.FC<VisitorDirectoryViewProps> = ({ onIn
               className="w-full pl-9 pr-3 py-1.5 text-xs bg-[#F4F7FA] border border-[#D8E1E8] rounded-lg focus:outline-none focus:border-[#0F766E]"
             />
           </div>
+
+          <button
+            id="download-visitor-directory-pdf-btn"
+            onClick={handleDownloadPdf}
+            disabled={isExportingPdf}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-semibold transition cursor-pointer shadow-2xs shrink-0"
+            title="Download formatted official visitor logs report as PDF document"
+          >
+            {isExportingPdf ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-700" />
+                <span>Exporting...</span>
+              </>
+            ) : (
+              <>
+                <FileDown className="w-3.5 h-3.5 text-teal-700" />
+                <span>Download as PDF</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 

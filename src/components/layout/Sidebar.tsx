@@ -20,19 +20,16 @@ import {
   BookOpen,
   Share2,
   Sliders,
-  Shield,
   ShieldCheck,
   UserCheck,
   Bell,
   LogOut,
-  Building2,
-  MapPin,
-  DoorOpen
+  Pin,
+  PinOff
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { NavViewId, UserRole } from '../../types';
 import { JSAlphaSoftLogo } from '../common/JSAlphaSoftLogo';
-import { OfflineSyncIndicator } from '../common/OfflineSyncIndicator';
 
 interface SidebarProps {
   currentView: NavViewId;
@@ -40,6 +37,12 @@ interface SidebarProps {
   onOpenSharePreRegModal: () => void;
   onOpenProfileModal?: () => void;
   onLogout?: () => void;
+  isOpen?: boolean;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
+  onClose?: () => void;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -48,6 +51,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSharePreRegModal,
   onOpenProfileModal,
   onLogout,
+  isOpen = true,
+  isPinned = false,
+  onTogglePin,
+  onClose,
+  onMouseEnter,
+  onMouseLeave,
 }) => {
   const state = storageService.getState();
   const activeUser = storageService.getActiveUser();
@@ -57,24 +66,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const currentlyInsideCount = state.visits.filter((v) => v.state === 'CHECKED_IN').length;
   const pendingEdgeSyncCount = state.edgeSyncEvents.filter((e) => e.status === 'PENDING_UPLOAD').length;
 
-  const handleTenantChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    storageService.setActiveContext({ tenantId: e.target.value });
-  };
-
-  const handleSiteChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    storageService.setActiveContext({ siteId: e.target.value });
-  };
-
-  const handleGateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    storageService.setActiveContext({ gateId: e.target.value });
-  };
-
-  const availableSites = state.sites.filter((s) => s.tenantId === state.activeTenantId);
-  const availableGates = state.gates.filter((g) => g.siteId === state.activeSiteId);
-
+  const isSuperAdmin = role === 'PLATFORM_SUPER_ADMIN';
   const isAdmin =
     role === 'TENANT_ADMIN' ||
     role === 'PLATFORM_SUPER_ADMIN' ||
+    role === 'SITE_ADMIN' ||
     role === 'TENANT_SECURITY_ADMIN';
 
   const isReceptionist = role === 'RECEPTIONIST';
@@ -96,9 +92,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }[] = [];
 
   // ==========================================
-  // Section: Admin & Governance (for Admins)
+  // Section: Admin & Governance (Strictly Super Admin Only)
   // ==========================================
-  if (isAdmin) {
+  if (isSuperAdmin) {
     sections.push({
       title: 'ADMINISTRATION & TENANTS',
       items: [
@@ -276,17 +272,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }
 
   return (
-    <aside className="w-64 shrink-0 bg-white border-r border-[#D8E1E8] flex flex-col h-[calc(100vh-3.5rem)]">
-      {/* Active Persona Banner */}
-      <div className="p-3 border-b border-[#E2E8F0] bg-[#F8FAFC] shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-[#123B5D] text-white flex items-center justify-center font-bold text-xs shrink-0">
+    <aside
+      id="main-navigation-sidebar"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      className={`fixed top-14 left-0 bottom-0 z-40 w-72 bg-white border-r border-[#D8E1E8] flex flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform shadow-md ${
+        isPinned
+          ? 'translate-x-0 opacity-100 pointer-events-auto'
+          : isOpen
+          ? 'shadow-2xl translate-x-0 opacity-100 pointer-events-auto'
+          : '-translate-x-full opacity-0 pointer-events-none'
+      }`}
+    >
+      {/* Active Persona Identity Header */}
+      <div className="p-3.5 border-b border-[#E2E8F0] bg-gradient-to-b from-[#F8FAFC] to-white shrink-0">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#123B5D] to-[#0F766E] text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0 ring-2 ring-teal-500/20">
               {activeUser.name.charAt(0)}
             </div>
             <div className="min-w-0">
-              <div className="text-xs font-bold text-[#172B3A] truncate">{activeUser.name}</div>
-              <div className="text-[10px] text-teal-700 font-semibold truncate flex items-center gap-1">
+              <div className="text-[13px] font-bold text-slate-900 leading-snug truncate">
+                {activeUser.name}
+              </div>
+              <div className="inline-flex items-center text-[10px] font-semibold text-teal-800 bg-teal-50 border border-teal-200/80 px-2 py-0.5 rounded-full mt-0.5">
                 <span>{role.replace(/_/g, ' ')}</span>
               </div>
             </div>
@@ -294,33 +303,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {onOpenProfileModal && (
             <button
+              id="sidebar-profile-bell-btn"
               onClick={onOpenProfileModal}
-              title="Host Arrival Alerts (SMS / Email / Slack)"
-              className="p-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 hover:text-teal-900 border border-teal-200 transition cursor-pointer"
+              title="Host Arrival Alert Channels (SMS, Email, Slack)"
+              className="p-2 rounded-xl bg-teal-50 text-teal-700 hover:bg-teal-100 hover:text-teal-900 border border-teal-200/90 transition-all duration-150 cursor-pointer shadow-2xs hover:shadow-xs shrink-0"
             >
               <Bell className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
 
-        <div className="mt-2 flex items-center justify-between text-[10px] text-[#526575]">
-          <span>
-            ID: <strong className="font-mono text-[#123B5D]">{activeUser.loginId}</strong>
+        <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+          <span className="truncate">
+            ID: <strong className="font-mono text-[#123B5D] font-semibold">{activeUser.loginId}</strong>
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5 shrink-0">
             {onOpenProfileModal && (
               <button
+                id="sidebar-profile-alerts-link"
                 onClick={onOpenProfileModal}
-                className="text-[10px] text-teal-700 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-[11px] text-teal-700 font-semibold hover:text-teal-900 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
               >
-                <span>Alerts Config</span>
+                <span>Alerts</span>
               </button>
             )}
             {onLogout && (
               <button
+                id="sidebar-profile-logout-link"
                 onClick={onLogout}
                 title="Log out of session"
-                className="text-[10px] text-red-600 hover:text-red-800 font-semibold hover:underline flex items-center gap-0.5 cursor-pointer"
+                className="text-[11px] text-red-600 hover:text-red-800 font-semibold hover:underline flex items-center gap-1 cursor-pointer transition-colors"
               >
                 <LogOut className="w-3 h-3" />
                 <span>Logout</span>
@@ -331,13 +343,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Navigation Sections (Scrollable) */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-5">
+      <div className="flex-1 overflow-y-auto p-3 space-y-5 scrollbar-thin">
         {sections.map((sec, idx) => (
-          <div key={idx}>
-            <div className="text-[10px] font-bold tracking-wider text-[#526575] uppercase px-3 mb-1.5 font-mono">
-              {sec.title}
+          <div key={idx} className="space-y-1">
+            <div
+              id={idx === 0 ? 'sidebar-first-nav-section-title' : undefined}
+              className="px-3 py-1 text-[11px] font-bold tracking-wider text-slate-400 uppercase font-mono flex items-center justify-between"
+            >
+              <span>{sec.title}</span>
             </div>
-            <nav className="space-y-0.5">
+            <nav className="space-y-1">
               {sec.items.map((item) => {
                 const Icon = item.icon;
                 const isAction = item.isAction;
@@ -349,16 +364,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       key={item.id}
                       id="sidebar-share-prereg-action-btn"
                       onClick={onOpenSharePreRegModal}
-                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-lg transition text-left bg-teal-50 text-teal-900 border border-teal-200 hover:bg-teal-100 hover:border-teal-300"
+                      className="group w-full flex items-center justify-between px-3 py-2.5 text-[13px] font-semibold rounded-xl transition-all duration-150 text-left bg-gradient-to-r from-teal-50 to-emerald-50/80 text-teal-900 border border-teal-200/90 hover:bg-teal-100/90 hover:border-teal-300 shadow-2xs cursor-pointer"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <Icon className="w-4 h-4 shrink-0 text-teal-700" />
+                        <Icon className="w-[18px] h-[18px] shrink-0 text-teal-700 group-hover:scale-105 transition-transform" />
                         <span className="truncate">{item.label}</span>
                       </div>
                       {item.badge && (
                         <span
-                          className={`text-[9px] px-1.5 py-0.5 rounded border leading-none shrink-0 ${
-                            item.badgeColor || 'bg-slate-100 text-slate-700'
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border leading-tight shrink-0 shadow-2xs ${
+                            item.badgeColor || 'bg-teal-100 text-teal-800 border-teal-300'
                           }`}
                         >
                           {item.badge}
@@ -372,30 +387,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     key={item.id}
                     id={`nav-item-${item.id}`}
-                    onClick={() => onSelectView(item.id as NavViewId)}
-                    className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium rounded-lg transition text-left ${
+                    onClick={() => {
+                      onSelectView(item.id as NavViewId);
+                      if (!isPinned && onClose) onClose();
+                    }}
+                    className={`group w-full flex items-center justify-between px-3 py-2.5 text-[13px] rounded-xl transition-all duration-150 text-left cursor-pointer ${
                       isActive
-                        ? 'bg-[#123B5D] text-white shadow-xs font-semibold'
-                        : 'text-[#172B3A] hover:bg-[#F4F7FA] hover:text-[#123B5D]'
+                        ? 'bg-gradient-to-r from-[#123B5D] to-[#164871] text-white shadow-xs font-semibold'
+                        : 'text-slate-700 hover:bg-slate-100/90 hover:text-slate-950 font-medium'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <Icon
-                        className={`w-4 h-4 shrink-0 ${
-                          isActive ? 'text-teal-300' : 'text-[#526575]'
+                        className={`w-[18px] h-[18px] shrink-0 transition-colors ${
+                          isActive ? 'text-teal-300' : 'text-slate-400 group-hover:text-slate-700'
                         }`}
                       />
                       <span className="truncate">{item.label}</span>
                     </div>
-                    {item.badge && (
-                      <span
-                        className={`text-[9px] px-1.5 py-0.5 rounded border leading-none shrink-0 ${
-                          item.badgeColor || 'bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {item.badge && (
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border leading-tight shrink-0 shadow-2xs tracking-tight ${
+                            isActive
+                              ? 'bg-white/20 text-white border-white/30'
+                              : item.badgeColor || 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                      {isActive && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0 shadow-2xs" />
+                      )}
+                    </div>
                   </button>
                 );
               })}
@@ -404,153 +429,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ))}
       </div>
 
-      {/* Persistent Administration Control Toolbar (Bottom of Sidebar) */}
-      <div className="shrink-0 border-t border-[#D8E1E8] bg-[#F8FAFC] p-3 space-y-2.5">
-        {/* Header & Status Row: Title/Admin Link, Arrival Alerts, Cloud Sync */}
-        <div className="flex items-center justify-between gap-1.5">
+      {/* Bottom Pin & Status Dock */}
+      <div className="p-3 border-t border-slate-200 bg-slate-50/80 shrink-0 flex items-center justify-between">
+        {onTogglePin && (
           <button
             type="button"
-            onClick={() => onSelectView('admin_hub')}
-            className="flex items-center gap-1.5 min-w-0 text-left hover:opacity-80 transition cursor-pointer"
-            title="Open Full Administration Center Hub"
-          >
-            <Shield className="w-3.5 h-3.5 text-[#123B5D] shrink-0" />
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#123B5D] font-mono truncate">
-              Admin Control
-            </span>
-          </button>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Arrival Notification Alerts */}
-            {onOpenProfileModal && (
-              <button
-                id="sidebar-bottom-arrival-alerts-btn"
-                onClick={onOpenProfileModal}
-                title="Host Visitor Arrival Alert Channels (SMS, Email, Slack)"
-                className="p-1 rounded-md bg-teal-50 text-teal-700 hover:bg-teal-100 hover:text-teal-900 border border-teal-200 transition relative cursor-pointer shrink-0"
-              >
-                <Bell className="w-3.5 h-3.5" />
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
-              </button>
-            )}
-
-            {/* Cloud Sync Indicator */}
-            <div className="scale-90 origin-right shrink-0">
-              <OfflineSyncIndicator />
-            </div>
-          </div>
-        </div>
-
-        {/* Tenant / Site / Gate Selector Hierarchy */}
-        <div className="space-y-1.5 bg-white p-2 rounded-xl border border-slate-200 shadow-2xs text-xs">
-          {/* Tenant Selector */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Building2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-            <select
-              id="sidebar-tenant-select"
-              value={state.activeTenantId}
-              onChange={handleTenantChange}
-              className="w-full bg-transparent text-[#172B3A] text-[11px] font-semibold focus:outline-none cursor-pointer truncate border-none"
-              title="Select Active Enterprise Tenant"
-            >
-              {state.tenants.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="border-t border-slate-100" />
-
-          {/* Site / Campus Selector */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <select
-              id="sidebar-site-select"
-              value={state.activeSiteId}
-              onChange={handleSiteChange}
-              className="w-full bg-transparent text-[#172B3A] text-[11px] font-medium focus:outline-none cursor-pointer truncate border-none"
-              title="Select Active Campus / Facility Site"
-            >
-              {availableSites.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="border-t border-slate-100" />
-
-          {/* Gate Turnstile Selector */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <DoorOpen className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <select
-              id="sidebar-gate-select"
-              value={state.activeGateId}
-              onChange={handleGateChange}
-              className="w-full bg-transparent text-[#172B3A] text-[11px] font-medium focus:outline-none cursor-pointer truncate border-none"
-              title="Select Active Gate / Barrier Turnstile"
-            >
-              {availableGates.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Pass Format Designer (under Administration Control Toolbar) */}
-        <button
-          id="sidebar-pass-format-designer-btn"
-          onClick={() => onSelectView('badges')}
-          className={`w-full p-2 rounded-xl border transition text-left flex items-center justify-between cursor-pointer group ${
-            currentView === 'badges'
-              ? 'bg-[#123B5D] text-white border-[#0f304c] shadow-xs'
-              : 'bg-white hover:bg-slate-50 text-[#172B3A] border-slate-200 shadow-2xs'
-          }`}
-          title="Open Pass Format Designer & Thermal Label Customizer"
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            <div
-              className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition ${
-                currentView === 'badges'
-                  ? 'bg-teal-500/25 text-teal-300'
-                  : 'bg-teal-50 text-teal-700 group-hover:bg-teal-100'
-              }`}
-            >
-              <Printer className="w-3.5 h-3.5" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold truncate">Pass Format Designer</div>
-              <div
-                className={`text-[10px] truncate ${
-                  currentView === 'badges' ? 'text-teal-200' : 'text-[#526575]'
-                }`}
-              >
-                QR Passes & Thermal Formats
-              </div>
-            </div>
-          </div>
-          <span
-            className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 font-mono ${
-              currentView === 'badges'
-                ? 'bg-teal-400/20 text-teal-200 border-teal-400/30'
-                : 'bg-teal-50 text-teal-700 border-teal-200'
+            id="sidebar-pin-toggle-btn"
+            onClick={onTogglePin}
+            title={isPinned ? 'Unpin sidebar (auto-collapses on selection)' : 'Pin sidebar to desktop workspace'}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border transition-all duration-150 cursor-pointer shadow-2xs ${
+              isPinned
+                ? 'bg-teal-50 text-teal-800 border-teal-300 hover:bg-teal-100'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
-            FORMAT
-          </span>
-        </button>
-
-        {/* Tenant DB Health */}
-        <div className="flex items-center justify-between text-[10px] text-[#526575] px-1">
-          <span>Tenant DB Health</span>
-          <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 font-semibold font-mono">
-            {state.tenants.find((t) => t.id === state.activeTenantId)?.databaseHealth || 'HEALTHY'}
-          </span>
+            {isPinned ? (
+              <>
+                <PinOff className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                <span>Pinned</span>
+              </>
+            ) : (
+              <>
+                <Pin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <span>Pin Sidebar</span>
+              </>
+            )}
+          </button>
+        )}
+        <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>VMS v3.4 Enterprise</span>
         </div>
       </div>
     </aside>

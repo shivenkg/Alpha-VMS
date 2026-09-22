@@ -15,10 +15,13 @@ import {
   Clock,
   Building,
   User,
-  Check
+  Check,
+  FileDown,
+  Loader2
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { Visit } from '../../types';
+import { generateVisitorPassPdf } from '../../utils/passPdfGenerator';
 
 interface VisitorQrPassModalProps {
   isOpen: boolean;
@@ -115,6 +118,20 @@ export const VisitorQrPassModal: React.FC<VisitorQrPassModalProps> = ({
       navigator.clipboard.writeText(visit.passToken);
       setCopiedToken(true);
       setTimeout(() => setCopiedToken(false), 2000);
+    }
+  };
+
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (!visit) return;
+    try {
+      setIsGeneratingPdf(true);
+      await generateVisitorPassPdf(visit, activeTenant, activeSite, { autoDownload: true });
+    } catch (err) {
+      console.error('Failed to generate pass PDF:', err);
+    } finally {
+      setIsGeneratingPdf(false);
     }
   };
 
@@ -371,17 +388,37 @@ export const VisitorQrPassModal: React.FC<VisitorQrPassModalProps> = ({
 
               <button
                 onClick={handleDownloadQr}
-                className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition"
+                className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer"
                 title="Download QR code image PNG"
               >
                 <Download className="w-3.5 h-3.5 text-slate-600" />
                 <span>Save PNG</span>
               </button>
+
+              <button
+                id="visitor-pass-download-pdf-btn"
+                onClick={handleDownloadPdf}
+                disabled={isGeneratingPdf}
+                className="px-3 py-1.5 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-semibold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                title="Download high-resolution printable PDF pass document"
+              >
+                {isGeneratingPdf ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-700" />
+                    <span>Generating PDF...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileDown className="w-3.5 h-3.5 text-teal-700" />
+                    <span>Download PDF</span>
+                  </>
+                )}
+              </button>
             </div>
 
             <button
               onClick={handlePrint}
-              className="px-4 py-1.5 rounded-lg bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-semibold text-xs flex items-center gap-1.5 transition shadow-xs"
+              className="px-4 py-1.5 rounded-lg bg-[#123B5D] hover:bg-[#0e2f4a] text-white font-semibold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Print Pass</span>

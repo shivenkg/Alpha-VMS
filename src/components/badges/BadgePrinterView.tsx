@@ -15,13 +15,16 @@ import {
   Smartphone,
   Scan,
   Zap,
-  Check
+  Check,
+  FileDown,
+  Loader2
 } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 import { Visit, BadgeTemplate, HardwareDevice } from '../../types';
 import { VisitorQrPassModal } from '../common/VisitorQrPassModal';
 import { ExpressMobileCheckoutModal } from './ExpressMobileCheckoutModal';
 import { JSAlphaSoftLogo } from '../common/JSAlphaSoftLogo';
+import { generateVisitorPassPdf } from '../../utils/passPdfGenerator';
 
 interface BadgePrinterViewProps {
   initialVisit?: Visit | null;
@@ -126,6 +129,20 @@ export const BadgePrinterView: React.FC<BadgePrinterViewProps> = ({ initialVisit
     }, 1200);
   };
 
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (!selectedVisit) return;
+    try {
+      setIsGeneratingPdf(true);
+      await generateVisitorPassPdf(selectedVisit, activeTenant, activeSite, { autoDownload: true });
+    } catch (err) {
+      console.error('Failed to generate pass PDF:', err);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   const handleBrowserNativePrint = () => {
     window.print();
   };
@@ -147,6 +164,26 @@ export const BadgePrinterView: React.FC<BadgePrinterViewProps> = ({ initialVisit
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            id="badge-printer-download-pdf-btn"
+            onClick={handleDownloadPdf}
+            disabled={isGeneratingPdf}
+            className="bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+            title="Generate and download printable visitor security pass as PDF"
+          >
+            {isGeneratingPdf ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-700" />
+                <span>Generating PDF...</span>
+              </>
+            ) : (
+              <>
+                <FileDown className="w-3.5 h-3.5 text-teal-700" />
+                <span>Download Pass PDF</span>
+              </>
+            )}
+          </button>
+
           <button
             id="mobile-scan-simulator-trigger-btn"
             onClick={() => setIsMobileScannerOpen(true)}
@@ -462,6 +499,26 @@ export const BadgePrinterView: React.FC<BadgePrinterViewProps> = ({ initialVisit
               >
                 <QrCode className="w-4 h-4" />
                 <span>Full Screen Digital Pass</span>
+              </button>
+
+              <button
+                id="preview-download-pdf-pass-btn"
+                onClick={handleDownloadPdf}
+                disabled={isGeneratingPdf}
+                className="px-3.5 py-2 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                title="Download this preview pass as PDF"
+              >
+                {isGeneratingPdf ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-teal-700" />
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileDown className="w-4 h-4 text-teal-700" />
+                    <span>Download Pass (PDF)</span>
+                  </>
+                )}
               </button>
             </div>
 
