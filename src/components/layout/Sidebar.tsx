@@ -114,7 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
         {
           id: 'customization',
-          label: 'System Customization',
+          label: 'System ABCDEF',
           icon: Sliders,
         },
       ],
